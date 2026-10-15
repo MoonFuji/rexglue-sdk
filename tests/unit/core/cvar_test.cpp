@@ -519,6 +519,27 @@ TEST_CASE("cvar TOML serialization", "[cvar]") {
   CHECK(toml.find("test_bool_flag") == std::string::npos);
 }
 
+// A string the writer does not escape makes LoadConfig reject the whole file,
+// and every saved setting silently reverts to its default.
+TEST_CASE("cvar SaveConfig round-trips strings that need escaping", "[cvar]") {
+  rex::cvar::testing::ResetAllForTesting();
+
+  auto config_path = std::filesystem::temp_directory_path() / "test_escaped_strings.toml";
+  const std::string value = "Z:\\home\\user \"quoted\" it's\nline\ttab\x01\x7f";
+
+  REXCVAR_SET(test_string_flag, value);
+  REXCVAR_SET(test_int32_flag, 7);
+  rex::cvar::SaveConfig(config_path);
+
+  rex::cvar::testing::ResetAllForTesting();
+  rex::cvar::LoadConfig(config_path);
+
+  CHECK(REXCVAR_GET(test_string_flag) == value);
+  CHECK(REXCVAR_GET(test_int32_flag) == 7);
+
+  std::filesystem::remove(config_path);
+}
+
 TEST_CASE("cvar metadata integration test", "[cvar][integration]") {
   rex::cvar::testing::ResetAllForTesting();
 

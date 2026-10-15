@@ -14,6 +14,7 @@
 #include <fstream>
 #include <mutex>
 #include <optional>
+#include <sstream>
 #include <string_view>
 #include <unordered_map>
 
@@ -535,13 +536,28 @@ std::vector<std::string> ListModifiedFlags() {
   return result;
 }
 
+namespace {
+
+// Quote a string value as a single-line TOML basic string, escaping backslashes,
+// quotes and control characters. The default formatter flags would also allow
+// literal and multi-line strings, and toml++ 3.4 does not write every multi-line
+// string back correctly.
+std::string TomlString(const std::string& value) {
+  const toml::value<std::string> node{value};
+  std::ostringstream out;
+  out << toml::toml_formatter{node, toml::format_flags::allow_unicode_strings};
+  return out.str();
+}
+
+}  // namespace
+
 std::string SerializeToTOML() {
   std::lock_guard lock(GetRegistryMutex());
   std::string result;
   for (const auto& entry : GetRegistryStorage()) {
     if (entry.getter() != entry.default_value) {
       if (entry.type == FlagType::String) {
-        result += entry.name + " = \"" + entry.getter() + "\"\n";
+        result += entry.name + " = " + TomlString(entry.getter()) + "\n";
       } else {
         result += entry.name + " = " + entry.getter() + "\n";
       }
@@ -556,7 +572,7 @@ std::string SerializeToTOML(std::string_view category) {
   for (const auto& entry : GetRegistryStorage()) {
     if (entry.category == category && entry.getter() != entry.default_value) {
       if (entry.type == FlagType::String) {
-        result += entry.name + " = \"" + entry.getter() + "\"\n";
+        result += entry.name + " = " + TomlString(entry.getter()) + "\n";
       } else {
         result += entry.name + " = " + entry.getter() + "\n";
       }
